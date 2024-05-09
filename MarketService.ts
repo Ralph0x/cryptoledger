@@ -1,4 +1,4 @@
-import axios from 'axios';
+import axios, { AxiosResponse } from 'axios';
 
 const { REACT_APP_API_BASE_URL } = process.env;
 
@@ -20,34 +20,31 @@ class MarketDataAPI {
     this.baseUrl = baseUrl;
   }
 
-  async fetchMarketData(): Promise<any> {
+  private async makeRequest<T>(method: 'get' | 'post', url: string, data?: any): Promise<T> {
     try {
-      const response = await axios.get(`${this.baseUrl}/market-data`);
+      const options = {
+        method,
+        url,
+        ...(method === 'get' ? { params: data } : { data }),
+      };
+      const response: AxiosResponse<T> = await axios(options);
       return response.data;
     } catch (error) {
-      console.error('Error fetching market data:', error);
+      console.error(`Error with request to ${url}:`, error);
       throw error;
     }
   }
 
-  async updatePortfolio(updateDetails: PortfolioUpdate): Promise<any> {
-    try {
-      const response = await axios.post(`${this.baseUrl}/portfolio`, updateDetails);
-      return response.data;
-    } catch (error) {
-      console.error('Error updating portfolio:', error);
-      throw error;
-    }
+  fetchMarketData(): Promise<any> {
+    return this.makeRequest('get', `${this.baseUrl}/market-data`);
   }
 
-  async analyzeHistoricalPerformance(params: HistoricalDataParams): Promise<any> {
-    try {
-      const response = await axios.get(`${this.baseUrl}/historical-performance`, { params });
-      return response.data;
-    } catch (error) {
-      console.error('Error analyzing historical performance:', error);
-      throw error;
-    }
+  updatePortfolio(updateDetails: PortfolioUpdate): Promise<any> {
+    return this.makeRequest('post', `${this.baseUrl}/portfolio`, updateDetails);
+  }
+
+  analyzeHistoricalPerformance(params: HistoricalDataParams): Promise<any> {
+    return this.makeRequest('get', `${this.baseUrl}/historical-performance`, params);
   }
 }
 
