@@ -1,4 +1,4 @@
-import axios, { AxiosResponse } from 'axios';
+import axios, { AxiosError, AxiosResponse } from 'axios';
 
 const { REACT_APP_API_BASE_URL } = process.env;
 
@@ -30,7 +30,20 @@ class MarketDataAPI {
       const response: AxiosResponse<T> = await axios(options);
       return response.data;
     } catch (error) {
-      console.error(`Error with request to ${url}:`, error);
+      if (axios.isAxiosError(error)) {
+        // Handling Axios errors specifically
+        const axiosError = error as AxiosError;
+        if (axiosError.response) {
+          console.error(`Axios error response for ${url}:`, axiosError.response);
+        } else if (axiosError.request) {
+          console.error(`Request made but no response received for ${url}.`, axiosError.request);
+        } else {
+          console.error(`Error setting up request to ${url}.`, axiosError.message);
+        }
+      } else {
+        // Handling non-Axios errors
+        console.error(`Non-Axios error with request to ${url}:`, error);
+      }
       throw error;
     }
   }
