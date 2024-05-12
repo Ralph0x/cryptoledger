@@ -21,10 +21,16 @@ interface MarketNews {
   url: string;
 }
 
+interface ErrorState {
+  hasError: boolean;
+  message?: string;
+}
+
 const CryptoLedgerDashboard: React.FC = () => {
   const [investments, setInvestments] = useState<Investment[]>([]);
   const [marketNews, setMarketNews] = useState<MarketNews[]>([]);
   const [chartData, setChartData] = useState({});
+  const [error, setError] = useState<ErrorState>({hasError: false, message: ''});
 
   useEffect(() => {
     fetchInvestmentsData();
@@ -32,7 +38,9 @@ const CryptoLedgerDashboard: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    updateChartData(investments);
+    if (investments.length > 0) {
+      updateChartData(investments);
+    }
   }, [investments]);
 
   const fetchInvestmentsData = async () => {
@@ -41,6 +49,7 @@ const CryptoLedgerDashboard: React.FC = () => {
       setInvestments(response.data);
     } catch (error) {
       console.error('Error fetching investments data:', error);
+      setError({ hasError: true, message: 'Failed to fetch investment data.' });
     }
   };
 
@@ -50,6 +59,7 @@ const CryptoLedgerDashboard: React.FC = () => {
       setMarketNews(response.data);
     } catch (error) {
       console.error('Error fetching market news:', error);
+      setError({ hasError: true, message: 'Failed to fetch market news.' });
     }
   };
 
@@ -68,6 +78,10 @@ const CryptoLedgerDashboard: React.FC = () => {
     };
     setChartData(data);
   };
+
+  if (error.hasError) {
+    return <div>Error: {error.message}</div>;
+  }
 
   return (
     <div>
