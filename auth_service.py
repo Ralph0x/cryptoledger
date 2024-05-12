@@ -5,9 +5,10 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from flask_sqlalchemy import SQLAlchemy
 from functools import wraps
 import jwt
+import uuid
 import datetime
 
-load_dotenv() # Load environment variables
+load_dotenv()  # Load environment variables
 
 app = Flask(__name__)
 
@@ -42,44 +43,61 @@ def token_required(f):
             return jsonify({'message': 'Token is invalid!'}), 401
 
         return f(current_user, *args, **kwargs)
-    
+
     return decorated
 
 @app.route('/user', methods=['POST'])
 def create_user():
     data = request.get_json()
-
+    
     hashed_password = generate_password_hash(data['password'], method='sha256')
-
+    
     new_user = User(public_id=str(uuid.uuid4()), name=data['name'], password=hashed_password, admin=False)
     db.session.add(new_user)
     db.session.commit()
-
+    
     return jsonify({'message': 'New user created!'})
 
 @app.route('/login')
 def login():
     auth = request.authorization
-
+    
     if not auth or not auth.username or not auth.password:
-        return make_response('Could not verify', 401, {'WWW-Authenticate' : 'Basic realm="Login required!"'})
-
+        return make_response('Could not verify', 401, {'WWW-Authenticate': 'Basic realm="Login required!"'})
+    
     user = User.query.filter_by(name=auth.username).first()
-
+    
     if not user:
-        return make_response('Could not verify', 401, {'WWW-Authenticate' : 'Basic realm="Login required!"'})
-
+        return make_response('Could not verify', 401, {'WWW-Authenticate': 'Basic realm="Login required!"'})
+    
     if check_password_hash(user.password, auth.password):
-        token = jwt.encode({'public_id': user.public_id, 'exp' : datetime.datetime.utcnow() + datetime.timedelta(minutes=30)}, app.config['SECRET_KEY'])
-
-        return jsonify({'token' : token})
-
-    return make_response('Could not verify', 401, {'WWW-Authenticate' : 'Basic realm="Login required!"'})
+        token = jwt.encode({'public_id': user.public_id, 'exp': datetime.datetime.utcnow() + datetime.timedelta(minutes=30)}, app.config['SECRET_KEY'])
+        
+        return jsonify({'token': token})
+    
+    return make_response('Could not verify', 401, {'WWW-Authenticate': 'Basic realm="Login required!"'})
 
 @app.route('/dashboard')
 @token_required
 def dashboard(current_user):
     return jsonify({'message': 'Dashboard accessed successfully'})
+
+@app.route('/promote/<public_id>', methods=['PUT'])
+@token_required
+def promote_user(current_user, public_id):
+    # Ensure only admin can promote users
+    if not current_user.admin:
+        return jsonify({'message': 'Cannot perform that function!'}), 403
+
+    user_to_promote = User.query.filter_by(public_id=public_id).first()
+
+    if not user_to_promote:
+        return jsonify({'message': 'No user found!'}), 404
+    
+    user_to_promote.admin = True
+    db.session.commit()
+    
+    return jsonify({'message': 'The user has been promoted to admin.'})
 
 if __name__ == '__main__':
     app.run(debug=True)
