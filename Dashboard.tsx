@@ -33,8 +33,7 @@ const CryptoLedgerDashboard: React.FC = () => {
   const [error, setError] = useState<ErrorState>({hasError: false, message: ''});
 
   useEffect(() => {
-    fetchInvestmentsData();
-    fetchMarketNewsData();
+    fetchDashboardData();
   }, []);
 
   useEffect(() => {
@@ -43,23 +42,20 @@ const CryptoLedgerDashboard: React.FC = () => {
     }
   }, [investments]);
 
-  const fetchInvestmentsData = async () => {
+  const fetchDashboardData = async () => {
     try {
-      const response = await axios.get(`${API_URL}/investments?apiKey=${API_KEY}`);
-      setInvestments(response.data);
-    } catch (error) {
-      console.error('Error fetching investments data:', error);
-      setError({ hasError: true, message: 'Failed to fetch investment data.' });
-    }
-  };
+      // Simultaneous requests for investments and market news
+      const [investmentsResponse, marketNewsResponse] = await Promise.all([
+        axios.get(`${API_URL}/investments?apiKey=${API_KEY}`),
+        axios.get(`${API_URL}/news?apiKey=${API_KEY}`)
+      ]);
 
-  const fetchMarketNewsData = async () => {
-    try {
-      const response = await axios.get(`${API_URL}/news?apiKey=${API_KEY}`);
-      setMarketNews(response.data);
+      // Setting state from both requests
+      setInvestments(investmentsResponse.data);
+      setMarketNews(marketNewsResponse.data);
     } catch (error) {
-      console.error('Error fetching market news:', error);
-      setError({ hasError: true, message: 'Failed to fetch market news.' });
+      console.error('Error fetching dashboard data:', error);
+      setError({ hasError: true, message: 'Failed to fetch dashboard data.' });
     }
   };
 
