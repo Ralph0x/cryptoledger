@@ -1,12 +1,20 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { Line } from "react-chartjs-2";
-import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend } from 'chart.js';
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Tooltip,
+  Legend,
+} from "chart.js";
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend);
 
 const API_KEY = process.env.REACT_APP_CRYPTO_API_KEY;
-const API_URL = 'https://api.example.com/data';
+const API_URL = "https://api.example.com/data";
 
 interface Investment {
   id: string;
@@ -30,7 +38,7 @@ const CryptoLedgerDashboard: React.FC = () => {
   const [investments, setInvestments] = useState<Investment[]>([]);
   const [marketNews, setMarketNews] = useState<MarketNews[]>([]);
   const [chartData, setChartData] = useState({});
-  const [error, setError] = useState<ErrorState>({hasError: false, message: ''});
+  const [error, setError] = useState<ErrorState>({ hasError: false, message: "" });
 
   useEffect(() => {
     fetchDashboardData();
@@ -42,36 +50,43 @@ const CryptoLedgerDashboard: React.FC = () => {
     }
   }, [investments]);
 
+  const logDataToConsole = (data: any, context: string) => {
+    console.log(`Logging ${context}: `, data);
+  };
+
   const fetchDashboardData = async () => {
     try {
-      // Simultaneous requests for investments and market news
       const [investmentsResponse, marketNewsResponse] = await Promise.all([
         axios.get(`${API_URL}/investments?apiKey=${API_KEY}`),
-        axios.get(`${API_URL}/news?apiKey=${API_KEY}`)
+        axios.get(`${API_URL}/news?apiKey=${API_KEY}`),
       ]);
 
-      // Setting state from both requests
+      logDataToConsole(investmentsResponse.data, "Investments Data");
+      logDataToConsole(marketNewsResponse.data, "Market News Data");
+
       setInvestments(investmentsResponse.data);
       setMarketNews(marketNewsResponse.data);
     } catch (error) {
-      console.error('Error fetching dashboard data:', error);
-      setError({ hasError: true, message: 'Failed to fetch dashboard data.' });
+      console.error("Error fetching dashboard data:", error);
+      setError({ hasError: true, message: "Failed to fetch dashboard data." });
+      logDataToConsole(error, "Error");
     }
   };
 
   const updateChartData = (investments: Investment[]) => {
-    const labels = investments.map(investment => investment.name);
+    const labels = investments.map((investment) => investment.name);
     const data = {
       labels,
       datasets: [
         {
-          label: 'Current Investment Value',
-          backgroundColor: 'rgba(53, 162, 235, 0.5)',
-          borderColor: 'rgba(53, 162, 235, 1)',
-          data: investments.map(investment => investment.currentPrice * investment.amountInvested),
+          label: "Current Investment Value",
+          backgroundColor: "rgba(53, 162, 235, 0.5)",
+          borderColor: "rgba(53, 162, 235, 1)",
+          data: investments.map((investment) => investment.currentPrice * investment.amountInvested),
         },
       ],
     };
+    logDataToConsole(data, "Chart Data");
     setChartData(data);
   };
 
@@ -82,11 +97,8 @@ const CryptoLedgerDashboard: React.FC = () => {
   return (
     <div>
       <h1>CryptoLedger Dashboard</h1>
-      
       <InvestmentList investments={investments} />
-      
       <AssetTrends chartData={chartData} />
-      
       <MarketNewsList marketNews={marketNews} />
     </div>
   );
@@ -119,7 +131,9 @@ const MarketNewsList: React.FC<{ marketNews: MarketNews[] }> = ({ marketNews }) 
       <div key={news.title}>
         <h3>{news.title}</h3>
         <p>{news.description}</p>
-        <a href={news.url} target="_blank" rel="noreferrer">Read more</a>
+        <a href={news.url} target="_blank" rel="noreferrer">
+          Read more
+        </a>
       </div>
     ))}
   </div>
