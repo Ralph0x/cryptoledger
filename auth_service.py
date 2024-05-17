@@ -13,120 +13,115 @@ load_dotenv()  # Load environment variables
 app = Flask(__name__)
 
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY')
-app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URI')
-app.config['JWT_ALGORITHM'] = os.getenv('JWT_ALGORITHM', 'HS256')  # New: JWT Algorithm from .env, default to HS256
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['DATABASE_URL'] = os.getenv('DATABASE_URI')
+app.config['JWT_ALGO'] = os.getenv('JWT_ALGORITHM', 'HS256')  # Specifying JWT Algorithm from .env, default to HS256
+app.config['TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
 
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    public_id = db.Column(db.String(50), unique=True)
-    name = db.Column(db.String(50))
-    password = db.Column(db.String(80))
-    admin = db.Column(db.Boolean)
+    unique_id = db.Column(db.String(50), unique=True)
+    username = db.Column(db.String(50))
+    hashed_password = db.Column(db.String(80))
+    is_admin = db.Column(db.Boolean)
 
-class RevokedToken(db.Model):  # New: Model to store revoked tokens
+class TokenBlacklist(db.Model):  # Model to store invalidated tokens
     id = db.Column(db.Integer, primary_key=True)
-    token = db.Column(db.String(120), unique=True)
+    revoked_token = db.Column(db.String(120), unique=True)
     
-    def add(self):
+    def save(self):
         db.session.add(self)
         db.session.commit()
 
-def token_required(f):
-    @wraps(f)
-    def decorated(*args, **kwargs):
-        token = None
+def require_token(function):
+    @wraps(function)
+    def decorated_function(*args, **kwargs):
+        access_token = request.headers.get('x-access-token')
 
-        if 'x-access-token' in request.headers:
-            token = request.headers['x-access-token']
-
-        if not token:
-            return jsonify({'message': 'Token is missing!'}), 401
+        if not access_token:
+            return jsonify({'message': 'Access token is missing!'}), 401
 
         try:
-            data = jwt.decode(token, app.config['SECRET_KEY'], algorithms=[app.config['JWT_ALGORITHM']])
-            if RevokedToken.query.filter_by(token=token).first():
-                raise Exception('Token has been revoked')
-            current_user = User.query.filter_by(public_id=data['public_id']).first()
+            payload = jwt.decode(access_token, app.config['SECRET_KEY'], algorithms=[app.config['JWT_ALGO']])
+            if TokenBlacklist.query.filter_by(revoked_token=access_token).first():
+                raise Exception('Access token has been invalidated')
+            authenticated_user = User.query.filter_by(unique_id=payload['public_id']).first()
         except:
-            return jsonify({'message': 'Token is invalid!'}), 401
+            return jsonify({'message': 'Access token is invalid!'}), 401
 
-        return f(current_user, *args, **kwargs)
+        return function(authenticated_user, *args, **kwargs)
 
-    return decorated
+    return decorated_function
 
 @app.route('/user', methods=['POST'])
-def create_user():
-    data = request.get_json()
+def register_user():
+    registration_data = request.get_json()
     
-    if User.query.filter_by(name=data['name']).first():
+    if User.query.filter_by(username=registration_data['name']).first():
         return jsonify({'message': 'User already exists.'}), 409
 
-    hashed_password = generate_password_hash(data['password'], method='sha256')
+    new_password_hash = generate_password_hash(registration_data['password'], method='sha256')
     
-    new_user = User(public_id=str(uuid.uuid4()), name=data['name'], password=hashed_password, admin=False)
+    new_user = User(unique_id=str(uuid.uuid4()), username=registration_data['name'], hashed_password=new_password_hash, is_admin=False)
     db.session.add(new_user)
     db.session.commit()
     
-    return jsonify({'message': 'New user created!'})
+    return jsonify({'message': 'New user registered!'})
 
 @app.route('/login')
-def login():
-    auth = request.authorization
+def authenticate_user():
+    credentials = request.authorization
     
-    if not auth or not auth.username or not auth.password:
-        return make_response('Missing credentials', 400, {'WWW-Authenticate': 'Basic realm="Login required!"'})
+    if not credentials or not credentials.username or not credentials.password:
+        return make_response('Credentials missing', 400, {'WWW-Authenticate': 'Basic realm="Authentication required!"'})
     
-    user = User.query.filter_by(name=auth.username).first()
+    user = User.query.filter_by(username=credentials.username).first()
     
     if not user:
-        return make_response('User not found', 404, {'WWW-Authenticate': 'Basic realm="Login required!"'})
+        return make_response('User not found', 404, {'WWW-Authenticate': 'Basic realm="Authentication required!"'})
     
-    if check_password_hash(user.password, auth.password):
-        token = jwt.encode({'public_id': user.public_id, 'exp': datetime.datetime.utcnow() + datetime.timedelta(minutes=30)}, app.config['SECRET_KEY'], algorithm=app.config['JWT_ALGORITHM'])
+    if check_password_hash(user.hashed_password, credentials.password):
+        token_payload = {'public_id': user.unique_id, 'exp': datetime.datetime.utcnow() + datetime.timedelta(minutes=30)}
+        generated_token = jwt.encode(token_payload, app.config['SECRET_KEY'], algorithm=app.config['JWT_ALGO'])
         
-        return jsonify({'token': token})
+        return jsonify({'token': generated_token})
     
-    return make_response('Invalid credentials', 403, {'WWW-Authenticate': 'Basic realm="Login required!"'})
+    return make_response('Invalid credentials', 403, {'WWW-Authenticate': 'Basic realm="Authentication required!"'})
 
-@app.route('/logout', methods=['POST'])  # New: Logout route
-@token_required
-def logout(current_user):
-    token = None
-    if 'x-access-token' in request.headers:
-        token = request.headers['x-access-token']
+@app.route('/logout', methods=['POST'])
+@require_token
+def invalidate_token(authenticated_user):
+    access_token = request.headers.get('x-access-token')
         
-    if token:
-        blacklisted_token = RevokedToken(token=token)  # Invalidate token
-        blacklisted_token.add()
-        return jsonify({'message': 'Token has been revoked'}), 200
+    if access_token:
+        invalidated_token = TokenBlacklist(revoked_token=access_token)
+        invalidated_token.save()
+        return jsonify({'message': 'Access token has been invalidated'}), 200
     
-    return jsonify({'message': 'Token is missing!'}), 401
+    return jsonify({'message': 'Access token is missing!'}), 401
 
 @app.route('/dashboard')
-@token_required
-def dashboard(current_user):
+@require_token
+def user_dashboard(authenticated_user):
     return jsonify({'message': 'Dashboard accessed successfully'})
 
-@app.route('/promote/<public_id>', methods=['PUT'])
-@token_required
-def promote_user(current_user, public_id):
-    # Ensure only admin can promote users
-    if not current_user.admin:
-        return jsonify({'message': 'Cannot perform that function!'}), 403
+@app.route('/promote/<unique_id>', methods=['PUT'])
+@require_token
+def promote_user_to_admin(authenticated_user, unique_id):
+    if not authenticated_user.is_admin:
+        return jsonify({'message': 'Insufficient permissions to execute this function!'}), 403
 
-    user_to_promote = User.query.filter_by(public_id=public_id).first()
+    user_to_promote = User.query.filter_by(unique_id=unique_id).first()
 
     if not user_to_promote:
-        return jsonify({'message': 'No user found!'}), 404
+        return jsonify({'message': 'User not found!'}), 404
     
-    user_to_promote.admin = True
+    user_to_promote.is_admin = True
     db.session.commit()
     
-    return jsonify({'message': 'The user has been promoted to admin.'})
+    return jsonify({'message': 'User has been promoted to admin status.'})
 
 if __name__ == '__main__':
-    db.create_all()  # Ensure all tables are created
+    db.create_all()  # Ensure all database tables are created
     app.run(debug=True)
