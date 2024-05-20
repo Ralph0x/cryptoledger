@@ -1,0 +1,93 @@
+body, h1, h2, h3, p, ul, li {
+    margin: 0;
+    padding: 0;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+body {
+    background-color: #f0f2f5;
+    color: #363537;
+    line-height: 1.6;
+}
+
+.container {
+    width: 80%;
+    margin: auto;
+    overflow: hidden;
+}
+
+.header {
+    background: #333;
+    color: #fff;
+    padding-top: 30px;
+    min-height: 70px;
+    border-bottom: #0779e4 3px solid;
+}
+
+.header h1 {
+    float: left;
+    font-size: 24px;
+}
+
+.header ul {
+    float: right;
+    list-style: none;
+}
+
+.header ul li {
+    display: inline;
+    margin-left: 20px;
+}
+
+.nav-link {
+    color: #fff;
+    text-decoration: none;
+    font-weight: bold;
+}
+
+.nav-link:hover {
+    color: #0779e4;
+}
+
+.main {
+    font-size: 18px;
+    padding: 20px;
+}
+
+.market-insights, .financial-data {
+    background: #fff;
+    padding: 20px;
+    margin-top: 20px;
+    box-shadow: 0px 0px 10px #ccc;
+}
+
+.financial-data table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.financial-data table, .financial-data th, .financial-data td {
+    border: 1px solid #ddd;
+    text-align: left;
+    padding: 8px;
+}
+
+.financial-data th {
+    background-color: #f4f4f4;
+}
+
+@media (max-width: 768px) {
+    .header h1, .header ul {
+        float: none;
+        text-align: center;
+    }
+    
+    .header ul li {
+        display: block;
+        margin-top: 10px;
+    }
+    
+    .container {
+        width: 95%;
+    }
+}
