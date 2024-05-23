@@ -25,36 +25,35 @@ class Logger {
     };
 
     constructor() {
-        this.logLevel = (process.env.LOG_LEVEL as LogLevel) ?? LogLevel.DEBUG;
+        this.logLevel = process.env.LOG_LEVEL as LogLevel ?? LogLevel.DEBUG;
         this.filePath = process.env.LOG_FILE_PATH ?? path.join(__dirname, 'app.log');
     }
 
     private shouldLog(level: LogLevel): boolean {
-        const levels = [LogLevel.DEBUG, LogLevel.INFO, LogLevel.WARN, LogLevel.ERROR];
-        const currentIndex = levels.indexOf(level);
-        const configIndex = levels.indexOf(this.logLevel);
-        return currentIndex >= configIndex;
+        const order = [LogLevel.DEBUG, LogLevel.INFO, LogLevel.WARN, LogLevel.ERROR];
+        return order.indexOf(level) >= order.indexOf(this.logLevel);
     }
 
-    private formatMessage(level: LogLevel, message: string, options?: LogOptions): string {
-        const { timestamp } = { ...this.defaultOptions, ...options };
-        return `[${level}]${timestamp ? ` [${new Date().toISOString()}]` : ''}: ${message}`;
+    private formatMessage(level: LogLevel, message: string, { timestamp = true }: LogOptions = {}): string {
+        const timeString = timestamp ? ` [${new Date().toISOString()}]` : '';
+        return `[${level}]${timeString}: ${message}`;
     }
 
-    private writeToFile(formattedMessage: string): void {
-        fs.appendFile(this.filePath, formattedMessage + '\n', (err) => {
+    private writeToFile(message: string): void {
+        fs.appendFile(this.filePath, message + '\n', (err) => {
             if (err) {
-                console.error(`Failed to write log to file: ${err}`);
+                this.log(LogLevel.ERROR, `Failed to write log to file: ${err}`, { toFile: false });
             }
         });
     }
 
-    private log(level: LogLevel, message: string, options?: LogOptions): void {
+    private log(level: LogLevel, message: string, options: LogOptions = {}): void {
         if (this.shouldLog(level)) {
-            const formattedMessage = this.formatMessage(level, message, options);
+            const mergedOptions = { ...this.defaultOptions, ...options };
+            const formattedMessage = this.formatMessage(level, message, mergedOptions);
             console.log(formattedMessage);
 
-            if (options?.toFile) {
+            if (mergedOptions.toFile) {
                 this.writeToFile(formattedMessage);
             }
         }
